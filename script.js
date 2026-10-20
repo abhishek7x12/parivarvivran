@@ -502,7 +502,7 @@ function submitHtml(){
   const f=fam(),ok=mobOf(mkOf()).length===10;setTimeout(gcPhotos,0);
   return`<section class="card" style="text-align:center"><p style="margin:0 0 8px">उपरोक्त जानकारी दाधीच समाज अध्यक्ष श्री रमेश चंद्र दाधीच से WhatsApp पर शेयर करें</p><div class="bar" style="justify-content:center"><button class="p wa" id="subBtn"${ok?'':' disabled'}>${WA_ICON}${f.submitted?'Reshare':'Share'}</button></div>${f.submitted?`<p style="margin:4px 0">✅ Submitted on ${new Date(f.submitted.at).toLocaleDateString('en-IN')}</p>`:''}${ok?'':'<p style="margin:4px 0;font-size:.85rem">जानकारी भेजने के लिए मुखिया का 10 अंकों का मोबाइल नंबर आवश्यक है।</p>'}</section>`}
 /* JSZip is only needed for sharing: load it on demand (self-hosted, same origin) instead of on every page view */
-const LIBS=['jszip.min.js'];
+const LIBS=['jszip_min.js'];
 let libsP=null;
 const loadLibs=()=>libsP||(libsP=Promise.all(LIBS.map(u=>new Promise((ok,no)=>{if(window.JSZip)return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>{s.remove();no(new Error('lib'))};document.head.appendChild(s)}))).catch(e=>{libsP=null;throw e}));
 /* Minimal .xlsx writer (replaces SheetJS): inline-string cells only, so values are never interpreted as formulas */
