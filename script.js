@@ -79,7 +79,7 @@ function personForm(p,role){
   const others=fam()?fam().members.filter(x=>x.id!==p.id):[];
   if(!M&&p.relation&&p.relV!=='2'){const mk0=fam()?.members.find(x=>x.role==='mukhiya');p={...p,relTo:mk0?mk0.id:''}}   // old records: relation was always to the mukhiya
   const rel=M?'':`<h2>संबंध विवरण</h2><div class="g">`+
-    fld('1. किस सदस्य से संबंधित है?','relTo',`<select id="relTo" name="relTo">${opts([],'','-- सदस्य चुनें --')}${others.map(o=>`<option value="${o.id}"${o.id===p.relTo?' selected':''}>${esc(pName(o))}${o.role==='mukhiya'?' (मुखिया)':''}</option>`).join('')}</select>`,1)+
+    fld('1. किस सदस्य से संबंधित है?','relTo',`<select id="relTo" name="relTo">${opts([],'','-- सदस्य चुनें --')}${others.map(o=>`<option value="${esc(o.id)}"${o.id===p.relTo?' selected':''}>${esc(pName(o))}${o.role==='mukhiya'?' (मुखिया)':''}</option>`).join('')}</select>`,1)+
     fld('यह व्यक्ति चुने गए उपरोक्त सदस्य का/की…','relation',`<select id="relation" name="relation">${opts(RELS,p.relation)}</select>`,1,'hid" data-s="rt')+
     fld('अन्य संबंध लिखें','relOther',inp('relOther',p.relOther),1,'hid" data-s="ro')+'</div>';
   let h='<form id="pf" novalidate class="card">'+rel+`<h2${M?'':' style="margin-top:18px"'}>${M?'मुखिया का विवरण':'सदस्य का विवरण'}</h2><div class="g">`;
@@ -111,7 +111,7 @@ function personForm(p,role){
     fld('पदनाम / व्यवसाय का नाम / नियोक्ता (वैकल्पिक)','desig',inp('desig',p.desig),0)+
     fld(M?'17. फोटो अपलोड करें':N(17,'फोटो अपलोड करें (वैकल्पिक)'),'photo',`<input type="file" id="photo" accept="image/*" hidden><input type="hidden" name="photo" value="${esc(p.photo)}"><input type="hidden" name="photoKey" value="${esc(p.photoKey||'')}"><div id="pv" style="margin-top:6px"></div>`,M,'full')+
     fld('अतिरिक्त जानकारी (वैकल्पिक)','notes',`<textarea id="notes" name="notes" rows="2">${esc(p.notes)}</textarea>`,0,'full')+'</div>';
-  h+=`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button type="submit" class="p" style="flex:1">Save Details</button>${fam()?`<button type="button" id="cancel">Cancel</button>`:''}${editId&&!M?`<button type="button" data-del="${editId}" style="color:var(--er);border-color:var(--er)">Delete member</button>`:''}</div></form>`+(M?'<p style="text-align:center;margin:0 0 8px"><button type="button" class="lnk" id="instrBtn">Read Instructions again</button></p>':'');
+  h+=`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button type="submit" class="p" style="flex:1">Save Details</button>${fam()?`<button type="button" id="cancel">Cancel</button>`:''}${editId&&!M?`<button type="button" data-del="${esc(editId)}" style="color:var(--er);border-color:var(--er)">Delete member</button>`:''}</div></form>`+(M?'<p style="text-align:center;margin:0 0 8px"><button type="button" class="lnk" id="instrBtn">Read Instructions again</button></p>':'');
   return h;
 }
 
@@ -461,7 +461,7 @@ function dash(){
   <section class="card"><h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>परिवार के सभी सदस्यों की सूची</span><span style="font-size:.85em;font-weight:600;white-space:nowrap;color:var(--tx)">कुल ${n}</span></h2>`;
   h+=`<div class="tw"><table><thead><tr><th>नाम</th><th>संबंध</th><th>कार्य</th></tr></thead><tbody>`+f.members.map(p=>{
     return`<tr><td><div class="nm">${p.photo?`<img class="ph" src="${esc(p.photo)}" alt="${esc(pName(p))} की फोटो">`:'<span class="ph" style="display:inline-block;background:#fbeccf" aria-hidden="true"></span>'}<b>${esc(pName(p))}</b></div></td><td>${relText(p)}</td>
-    <td><button class="ic" data-ed="${p.id}" title="संपादित करें" aria-label="${esc(pName(p))} का विवरण संपादित करें">${SVG.edit}</button></td></tr>`}).join('')+'</tbody></table></div>';
+    <td><button class="ic" data-ed="${esc(p.id)}" title="संपादित करें" aria-label="${esc(pName(p))} का विवरण संपादित करें">${SVG.edit}</button></td></tr>`}).join('')+'</tbody></table></div>';
   return h+'<div class="bar"><button class="p" id="addM">+ परिवार का सदस्य जोड़ें</button></div></section>'+submitHtml()+'<p style="text-align:center;margin:0 0 8px"><button type="button" class="lnk" id="instrBtn">Read Instructions again</button></p><p style="text-align:center;margin:16px 0 8px;font-size:.72rem;opacity:.8">Developed by Abhishek Dadhich <a href="tel:+919828663770">9828663770</a></p>';
 }
 
@@ -501,10 +501,22 @@ const mkOf=()=>fam().members.find(x=>x.role==='mukhiya');
 function submitHtml(){
   const f=fam(),ok=mobOf(mkOf()).length===10;setTimeout(gcPhotos,0);
   return`<section class="card" style="text-align:center"><p style="margin:0 0 8px">उपरोक्त जानकारी दाधीच समाज अध्यक्ष श्री रमेश चंद्र दाधीच से WhatsApp पर शेयर करें</p><div class="bar" style="justify-content:center"><button class="p wa" id="subBtn"${ok?'':' disabled'}>${WA_ICON}${f.submitted?'Reshare':'Share'}</button></div>${f.submitted?`<p style="margin:4px 0">✅ Submitted on ${new Date(f.submitted.at).toLocaleDateString('en-IN')}</p>`:''}${ok?'':'<p style="margin:4px 0;font-size:.85rem">जानकारी भेजने के लिए मुखिया का 10 अंकों का मोबाइल नंबर आवश्यक है।</p>'}</section>`}
-/* JSZip + SheetJS are only needed for sharing: load them on demand instead of on every page view */
-const LIBS=['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'];
+/* JSZip is only needed for sharing: load it on demand (self-hosted, same origin) instead of on every page view */
+const LIBS=['jszip.min.js'];
 let libsP=null;
-const loadLibs=()=>libsP||(libsP=Promise.all(LIBS.map(u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.crossOrigin='anonymous';s.referrerPolicy='no-referrer';s.onload=ok;s.onerror=()=>{s.remove();no(new Error('lib'))};document.head.appendChild(s)}))).catch(e=>{libsP=null;throw e}));
+const loadLibs=()=>libsP||(libsP=Promise.all(LIBS.map(u=>new Promise((ok,no)=>{if(window.JSZip)return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>{s.remove();no(new Error('lib'))};document.head.appendChild(s)}))).catch(e=>{libsP=null;throw e}));
+/* Minimal .xlsx writer (replaces SheetJS): inline-string cells only, so values are never interpreted as formulas */
+const xEsc=v=>String(v).replace(/[^\t\n\r\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/gu,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+const xCol=i=>{let s='';for(i++;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s};
+const xSheet=aoa=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+aoa.map((r,y)=>`<row r="${y+1}">`+r.map((v,x)=>{const ref=xCol(x)+(y+1);return v===''||v==null?'':typeof v==='number'&&isFinite(v)?`<c r="${ref}"><v>${v}</v></c>`:`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`}).join('')+'</row>').join('')+'</sheetData></worksheet>';
+async function xlsxBuild(sheets){   // sheets: [[name, aoa], ...] -> Uint8Array
+  const z=new JSZip(),H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',N=sheets.length;
+  z.file('[Content_Types].xml',H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>');
+  z.file('_rels/.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml',H+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map(([n],i)=>`<sheet name="${xEsc(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+'</sheets></workbook>');
+  z.file('xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+'</Relationships>');
+  sheets.forEach(([,aoa],i)=>z.file(`xl/worksheets/sheet${i+1}.xml`,xSheet(aoa)));
+  return z.generateAsync({type:'uint8array',compression:'DEFLATE'})}
 async function buildZip(){
   await loadLibs();
   const f=fam(),mk=mkOf(),mob=mobOf(mk),n=(f.submitted?.n||0)+1,zip=new JSZip(),used={},rows=[];
@@ -517,10 +529,8 @@ async function buildZip(){
       let base=`${mob}_${enName(p.name).replace(/ /g,'_')||'Member_'+i}`;used[base]=(used[base]||0)+1;if(used[base]>1)base+='_'+used[base];
       file=`${base}.${ext}`;zip.file(file,b)}
     rows.push([i,...XCOLS.map(k=>k==='dob'||k==='marriage'?toDMY(p[k]):k==='relTo'?(f.members.find(x=>x.id===p.relTo)?pName(f.members.find(x=>x.id===p.relTo)):''):p[k]??''),file])}
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Serial',...XCOLS,'Photo file'],...rows]),'Parivar');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Mukhiya',pName(mk)],['Mobile',mob],['Submission number',n],['Consent given at',new Date().toLocaleString('en-IN')],['Consent text',CONSENT]]),'Consent');
-  zip.file(`${mob}.xlsx`,XLSX.write(wb,{bookType:'xlsx',type:'array'}));
+  const xbytes=await xlsxBuild([['Parivar',[['Serial',...XCOLS,'Photo file'],...rows]],['Consent',[['Mukhiya',pName(mk)],['Mobile',mob],['Submission number',n],['Consent given at',new Date().toLocaleString('en-IN')],['Consent text',CONSENT]]]]);
+  zip.file(`${mob}.xlsx`,xbytes);
   return{blob:await zip.generateAsync({type:'blob',compression:'DEFLATE'}),name:`${enName(mk.name)} ${mob}${n>1?'-'+n:''}.zip`,n}}
 function sbText(){const mk=mkOf();return['DDH Parivar Vivran 2026','मुखिया: '+pName(mk),'साख: '+saakhLabel(mk.shakha,mk.gotra),'शहर/गाँव: '+(mk.city||''),'जिला: '+(mk.district||''),'राज्य: '+stateLabel(normState(mk.state)),'मोबाइल: '+mobOf(mk),'व्यवसाय: '+profText(mk)].join('\n')}
 let sbBuild=null;
@@ -542,7 +552,7 @@ async function sbShare(){
     try{await navigator.share({files:[file],text:sbText()});sbStep('confirm');return}
     catch(e){if(e.name==='AbortError'){btn.disabled=false;return}}}
   const a=document.createElement('a');a.href=URL.createObjectURL(r.blob);a.download=r.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  window.open(`https://wa.me/${WA_NO}?text=${encodeURIComponent(sbText())}`,'_blank');sbStep('steps')}
+  window.open(`https://wa.me/${WA_NO}?text=${encodeURIComponent(sbText())}`,'_blank','noopener,noreferrer');sbStep('steps')}
 document.addEventListener('change',e=>{if(e.target.id==='sbChk'){$('#sbGo').disabled=!e.target.checked;if(e.target.checked)sbStart()}});
 document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
   if(t.id==='subBtn')sbOpen();
