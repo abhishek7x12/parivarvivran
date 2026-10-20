@@ -504,7 +504,8 @@ function submitHtml(){
 /* JSZip is only needed for sharing: load it on demand (self-hosted, same origin) instead of on every page view */
 const LIBS=['jszip_min.js'];
 let libsP=null;
-const loadLibs=()=>libsP||(libsP=Promise.all(LIBS.map(u=>new Promise((ok,no)=>{if(window.JSZip)return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>{s.remove();no(new Error('lib'))};document.head.appendChild(s)}))).catch(e=>{libsP=null;throw e}));
+const loadScript=u=>new Promise((ok,no)=>{if(window.JSZip)return ok();const s=document.createElement('script');s.src=u;s.onload=()=>window.JSZip?ok():no(new Error('lib: JSZip not defined'));s.onerror=()=>{s.remove();no(new Error('lib: could not load '+u))};document.head.appendChild(s)});
+const loadLibs=()=>libsP||(libsP=Promise.all(LIBS.map(u=>loadScript(u).catch(()=>loadScript(u+'?r='+Date.now())))).catch(e=>{libsP=null;throw e}));   // 2nd try bypasses a bad cached/failed response
 /* Minimal .xlsx writer (replaces SheetJS): inline-string cells only, so values are never interpreted as formulas */
 const xEsc=v=>String(v).replace(/[^\t\n\r\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/gu,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 const xCol=i=>{let s='';for(i++;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s};
@@ -517,17 +518,26 @@ async function xlsxBuild(sheets){   // sheets: [[name, aoa], ...] -> Uint8Array
   z.file('xl/_rels/workbook.xml.rels',H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+'</Relationships>');
   sheets.forEach(([,aoa],i)=>z.file(`xl/worksheets/sheet${i+1}.xml`,xSheet(aoa)));
   return z.generateAsync({type:'uint8array',compression:'DEFLATE'})}
+/* Photo bytes for the ZIP. The bytes are read here (not inside JSZip) so one unreadable/evicted photo can never break the whole ZIP.
+   Order: full-size original (IndexedDB) -> saved display copy (data URL) -> none (member is still included, without photo). */
+const blobBuf=b=>b.arrayBuffer?b.arrayBuffer():new Response(b).arrayBuffer();
+function dataUrlBytes(u){const m=/^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(u||'');if(!m)return null;
+  const t=m[2]?atob(m[3]):decodeURIComponent(m[3]),a=new Uint8Array(t.length);for(let i=0;i<t.length;i++)a[i]=t.charCodeAt(i);return{buf:a,type:m[1]}}
+async function photoBytes(p){
+  try{const b=p.photoKey&&await IDB.get(p.photoKey);if(b instanceof Blob&&b.size)return{buf:await blobBuf(b),type:b.type}}catch(e){}
+  try{const d=dataUrlBytes(p.photo);if(d&&d.buf.length)return d}catch(e){}
+  try{const b=await(await fetch(p.photo)).blob();return{buf:await blobBuf(b),type:b.type}}catch(e){}
+  return null}
 async function buildZip(){
   await loadLibs();
   const f=fam(),mk=mkOf(),mob=mobOf(mk),n=(f.submitted?.n||0)+1,zip=new JSZip(),used={},rows=[];
   let i=0;
   for(const p of f.members){i++;let file='';
-    if(p.photo){let b=null;try{b=p.photoKey&&await IDB.get(p.photoKey)}catch(e){}
-      if(!(b instanceof Blob))b=null;   // missing or unreadable original: fall back to the saved copy
-      if(!b)b=await(await fetch(p.photo)).blob();
-      const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/heic':'heic'}[b.type]||'jpg';
-      let base=`${mob}_${enName(p.name).replace(/ /g,'_')||'Member_'+i}`;used[base]=(used[base]||0)+1;if(used[base]>1)base+='_'+used[base];
-      file=`${base}.${ext}`;zip.file(file,b)}
+    if(p.photo){const ph=await photoBytes(p);
+      if(ph){const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/heic':'heic'}[ph.type]||'jpg';
+        let base=`${mob}_${enName(p.name).replace(/ /g,'_')||'Member_'+i}`;used[base]=(used[base]||0)+1;if(used[base]>1)base+='_'+used[base];
+        file=`${base}.${ext}`;zip.file(file,ph.buf,{binary:true,compression:'STORE'})}   // JPEG/PNG are already compressed: store as-is
+      else file='(photo unavailable)'}
     rows.push([i,...XCOLS.map(k=>k==='dob'||k==='marriage'?toDMY(p[k]):k==='relTo'?(f.members.find(x=>x.id===p.relTo)?pName(f.members.find(x=>x.id===p.relTo)):''):p[k]??''),file])}
   const xbytes=await xlsxBuild([['Parivar',[['Serial',...XCOLS,'Photo file'],...rows]],['Consent',[['Mukhiya',pName(mk)],['Mobile',mob],['Submission number',n],['Consent given at',new Date().toLocaleString('en-IN')],['Consent text',CONSENT]]]]);
   zip.file(`${mob}.xlsx`,xbytes);
@@ -546,7 +556,9 @@ function sbOpen(){
   d.innerHTML='<div class="sk-sheet" role="dialog" aria-modal="true" style="border-radius:24px;max-width:400px;padding:24px 20px" id="sb-body"></div>';document.body.appendChild(d);sbStep('consent');loadLibs().catch(()=>{})}
 async function sbShare(){
   const btn=$('#sbGo');btn.disabled=true;
-  let r;try{r=await sbStart()}catch(e){alert('ZIP फाइल नहीं बन सकी। कृपया इंटरनेट चालू करके दोबारा प्रयास करें।');sbBuild=null;btn.disabled=false;return}
+  let r;try{r=await sbStart()}catch(e){console.error('ZIP build failed:',e);const lib=/^lib/.test(e&&e.message||'');
+    alert((lib?'ZIP बनाने वाली फाइल लोड नहीं हो सकी। कृपया इंटरनेट चालू करके पेज रीफ्रेश करें और दोबारा प्रयास करें।':'ZIP फाइल नहीं बन सकी। कृपया पेज रीफ्रेश करके दोबारा प्रयास करें।')+'\n\n['+(e&&e.message||e)+']');
+    sbBuild=null;btn.disabled=false;return}
   const file=new File([r.blob],r.name,{type:'application/zip'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){
     try{await navigator.share({files:[file],text:sbText()});sbStep('confirm');return}
@@ -561,7 +573,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
   else if(t.id==='sbNext')sbStep('confirm');
   else if(t.id==='sbNo')sbStep('consent');
   else if(t.id==='sbCopy'){navigator.clipboard?.writeText('9413843202').then(()=>{t.textContent='कॉपी हो गया ✓'}).catch(()=>{})}
-  else if(t.id==='sbSent'){sbStart().then(r=>{fam().submitted={n:r.n,at:new Date().toISOString()};Store.save(db);sbClose();flash='जानकारी भेजने की स्थिति सुरक्षित हो गई।';render()})}});
+  else if(t.id==='sbSent'){sbStart().then(r=>{fam().submitted={n:r.n,at:new Date().toISOString()};Store.save(db);sbClose();flash='जानकारी भेजने की स्थिति सुरक्षित हो गई।';render()}).catch(e=>{console.error(e);sbBuild=null;alert('स्थिति सुरक्षित नहीं हो सकी। कृपया दोबारा प्रयास करें।')})}});
 
 /* ===== Instructions pop-up: opens by itself 3 s after the user first scrolls the mukhiya form; only the OK button closes it ===== */
 const INSTR_KEY='dadhich_instructions_seen';
